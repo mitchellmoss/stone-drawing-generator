@@ -15,17 +15,32 @@ A web application for creating and exporting stone mockups for countertop fabric
 
 ## Getting Started
 
-First, install the dependencies:
+### Prerequisites
 
-```bash
-pnpm install
-```
+- Node.js 18.17.0 or later
+- pnpm (7.x or later recommended)
 
-Then, run the development server:
+### Installation
 
-```bash
-pnpm dev
-```
+1. Ensure you have the correct Node.js version:
+   ```bash
+   # Using nvm (recommended)
+   nvm install 18.17.0
+   nvm use 18.17.0
+
+   # Or check your current version
+   node --version  # Should be v18.17.0 or higher
+   ```
+
+2. Install the dependencies:
+   ```bash
+   pnpm install
+   ```
+
+3. Run the development server:
+   ```bash
+   pnpm dev
+   ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the application.
 
