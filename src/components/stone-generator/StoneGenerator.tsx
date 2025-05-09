@@ -63,15 +63,12 @@ export function StoneGenerator({ onSavePiece, onRemovePiece, savedPieces }: Ston
   
   // Loading state for PDF generation
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
-  
+
   // Toast notification state
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
 
   // Canvas reference
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  
-  // Worker reference for PDF generation
-  const workerRef = useRef<Worker | null>(null);
 
   // Debounced redraw function to prevent excessive canvas updates
   const redrawCanvas = useCallback(() => {
@@ -94,14 +91,9 @@ export function StoneGenerator({ onSavePiece, onRemovePiece, savedPieces }: Ston
     return () => clearTimeout(timer);
   }, [redrawCanvas]);
   
-  // Initialize web worker for PDF generation
-  useEffect(() => {
-    // Clean up worker on component unmount
-    return () => {
-      if (workerRef.current) {
-        workerRef.current.terminate();
-      }
-    };
+  // Detect mobile device
+  const isMobileDevice = useCallback(() => {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
   }, []);
 
   // Handle dimension changes
@@ -192,48 +184,35 @@ export function StoneGenerator({ onSavePiece, onRemovePiece, savedPieces }: Ston
     }
   };
 
-  // Handle download as PDF - improved for mobile compatibility
+  // Handle download as PDF - improved for performance
   const handleDownloadPDF = async () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    
+
     setIsGeneratingPDF(true);
-    
+
     try {
-      // Use a timeout to allow the UI to update before starting the heavy PDF generation
-      setTimeout(async () => {
-        try {
-          // Check if running on mobile
-          const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-          
-          await exportToPDF(canvas, specs, notes, isMobile);
-          
-          // Show success toast
-          setToast({
-            message: 'PDF exported successfully',
-            type: 'success'
-          });
-        } catch (error) {
-          console.error('Error generating PDF:', error);
-          
-          // Show error toast
-          setToast({
-            message: 'Error exporting to PDF: ' + (error instanceof Error ? error.message : 'Unknown error'),
-            type: 'error'
-          });
-        } finally {
-          setIsGeneratingPDF(false);
-        }
-      }, 100);
+      // Use the mobile detection function
+      const isMobile = isMobileDevice();
+
+      // Call the improved exportToPDF with proper error handling
+      await exportToPDF(canvas, specs, notes, isMobile);
+
+      // Show success toast
+      setToast({
+        message: 'PDF exported successfully',
+        type: 'success'
+      });
     } catch (error) {
-      console.error('Error setting up PDF generation:', error);
-      setIsGeneratingPDF(false);
-      
+      console.error('Error generating PDF:', error);
+
       // Show error toast
       setToast({
-        message: 'Failed to generate PDF. Please try again.',
+        message: 'Error exporting to PDF: ' + (error instanceof Error ? error.message : 'Unknown error'),
         type: 'error'
       });
+    } finally {
+      setIsGeneratingPDF(false);
     }
   };
 

@@ -40,16 +40,30 @@ const Toast = ({ message, type = 'success', onClose }: { message: string, type?:
 export function MultiPieceExport({ savedPieces }: MultiPieceExportProps) {
   const [projectName, setProjectName] = useLocalStorage<string>('stone-mockup-generator:projectName', 'Stone Project')
   const [isExporting, setIsExporting] = useState(false)
+  const [exportProgress, setExportProgress] = useState(0);
   const canvasRefs = useRef<(HTMLCanvasElement | null)[]>([])
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
 
-  // Initialize canvas refs array
+  // Initialize canvas refs array - improved to handle piece reordering better
   useEffect(() => {
-    canvasRefs.current = canvasRefs.current.slice(0, savedPieces.length);
-    while (canvasRefs.current.length < savedPieces.length) {
-      canvasRefs.current.push(null);
+    // Create a new array with the correct length
+    const newCanvasRefs: (HTMLCanvasElement | null)[] = [];
+    for (let i = 0; i < savedPieces.length; i++) {
+      // Try to preserve existing canvas refs by ID if possible
+      const pieceId = savedPieces[i].id;
+      const existingIndex = canvasRefs.current.findIndex((_, idx) => {
+        return idx < savedPieces.length && savedPieces[idx]?.id === pieceId;
+      });
+
+      if (existingIndex >= 0) {
+        newCanvasRefs.push(canvasRefs.current[existingIndex]);
+      } else {
+        newCanvasRefs.push(null);
+      }
     }
-  }, [savedPieces.length]);
+
+    canvasRefs.current = newCanvasRefs;
+  }, [savedPieces]);  // Depend on the full array to detect reordering
 
   // Pre-render all canvases when pieces change
   useEffect(() => {
@@ -70,6 +84,31 @@ export function MultiPieceExport({ savedPieces }: MultiPieceExportProps) {
     });
   }, [savedPieces]);
 
+  // Detect mobile device
+  const isMobileDevice = () => {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  };
+
+  // Pre-render a single canvas
+  const renderCanvas = useCallback((piece: StonePiece, canvas: HTMLCanvasElement) => {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return false;
+
+    try {
+      // Draw the mockup with default options
+      drawStoneMockup(ctx, piece.specs, {
+        showGrid: true,
+        showPolishedEdges: true,
+        useXMarks: true,
+        scale: 1
+      });
+      return true;
+    } catch (error) {
+      console.error('Error rendering canvas:', error);
+      return false;
+    }
+  }, []);
+
   // Handle export to PDF
   const handleExportPDF = async () => {
     if (savedPieces.length === 0) {
@@ -81,67 +120,67 @@ export function MultiPieceExport({ savedPieces }: MultiPieceExportProps) {
     }
 
     setIsExporting(true);
+    setExportProgress(0);
 
     try {
-      // Ensure all canvases are rendered before export
-      savedPieces.forEach((piece, index) => {
-        const canvas = canvasRefs.current[index];
-        if (!canvas) return;
+      // Render the canvases - with progress tracking
+      let renderedCount = 0;
 
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-
-        // Draw the mockup with default options
-        drawStoneMockup(ctx, piece.specs, {
-          showGrid: true,
-          showPolishedEdges: true,
-          useXMarks: true,
-          scale: 1
-        });
-      });
+      for (let i = 0; i < savedPieces.length; i++) {
+        const canvas = canvasRefs.current[i];
+        if (canvas) {
+          renderCanvas(savedPieces[i], canvas);
+        }
+        renderedCount++;
+        setExportProgress(Math.floor((renderedCount / savedPieces.length) * 50)); // First 50% is rendering
+      }
 
       // Filter out any null canvases
       const validCanvases = canvasRefs.current.filter(
         (canvas): canvas is HTMLCanvasElement => canvas !== null
       );
 
-      // Check if running on mobile
-      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      try {
+        // Check if running on mobile
+        const isMobile = isMobileDevice();
 
-      // Use a timeout to allow the UI to update before starting the heavy PDF generation
-      setTimeout(async () => {
-        try {
-          // Export all pieces to a single PDF
-          await exportMultipleToPDF(
-            validCanvases,
-            savedPieces,
-            projectName,
-            isMobile
-          );
-          
-          setToast({
-            message: 'PDF exported successfully',
-            type: 'success'
-          });
-        } catch (error) {
-          console.error('Error exporting to PDF:', error);
-          
-          setToast({
-            message: 'Error exporting to PDF: ' + (error instanceof Error ? error.message : 'Unknown error'),
-            type: 'error'
-          });
-        } finally {
-          setIsExporting(false);
-        }
-      }, 100);
+        // Set progress to show we're starting PDF generation
+        setExportProgress(50);
+
+        // Export all pieces to a single PDF with the improved function
+        await exportMultipleToPDF(
+          validCanvases,
+          savedPieces,
+          projectName,
+          isMobile
+        );
+
+        setExportProgress(100);
+        setToast({
+          message: 'PDF exported successfully',
+          type: 'success'
+        });
+      } catch (error) {
+        console.error('Error exporting to PDF:', error);
+
+        setToast({
+          message: 'Error exporting to PDF: ' + (error instanceof Error ? error.message : 'Unknown error'),
+          type: 'error'
+        });
+      } finally {
+        setIsExporting(false);
+        // Reset progress after a brief delay to show 100%
+        setTimeout(() => setExportProgress(0), 1000);
+      }
     } catch (error) {
       console.error('Error preparing for PDF export:', error);
-      
+
       setToast({
         message: 'Failed to prepare for PDF export. Please try again.',
         type: 'error'
       });
       setIsExporting(false);
+      setExportProgress(0);
     }
   };
 
@@ -190,13 +229,25 @@ export function MultiPieceExport({ savedPieces }: MultiPieceExportProps) {
         </div>
       </div>
       
-      <button
-        className="w-full px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-md hover:from-blue-700 hover:to-blue-600 transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5 disabled:opacity-70 disabled:transform-none disabled:shadow-none"
-        onClick={handleExportPDF}
-        disabled={isExporting || savedPieces.length === 0}
-      >
-        {isExporting ? 'Generating PDF...' : 'Export All Pieces to PDF'}
-      </button>
+      <div className="space-y-2">
+        <button
+          className="w-full px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-500 text-white rounded-md hover:from-blue-700 hover:to-blue-600 transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5 disabled:opacity-70 disabled:transform-none disabled:shadow-none"
+          onClick={handleExportPDF}
+          disabled={isExporting || savedPieces.length === 0}
+        >
+          {isExporting ? `Generating PDF... ${exportProgress}%` : 'Export All Pieces to PDF'}
+        </button>
+
+        {/* Progress bar */}
+        {isExporting && (
+          <div className="w-full bg-gray-200 rounded-full h-2.5">
+            <div
+              className="bg-blue-600 h-2.5 rounded-full transition-all duration-300 ease-in-out"
+              style={{ width: `${exportProgress}%` }}
+            ></div>
+          </div>
+        )}
+      </div>
       
       {/* Hidden canvases for rendering each piece */}
       <div className="hidden">
