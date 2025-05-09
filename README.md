@@ -1,36 +1,69 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Stone Mockup Generator
+
+A web application for creating and exporting stone mockups for countertop fabrication and similar purposes. Built with Next.js and TypeScript.
+
+![Stone Mockup Generator Screenshot](public/screenshot.png)
+
+## Features
+
+- **Create Stone Mockups**: Specify dimensions, material properties, and polished edges to generate visual mockups
+- **Export Options**: Download as PNG or PDF
+- **Multi-piece Support**: Save multiple stone pieces and export them together
+- **Fraction Input**: Enter measurements as fractions (e.g., "2-1/2" or "3/4")
+- **Notes**: Add specific notes to each stone piece
+- **Local Storage**: Automatically saves your work in progress
 
 ## Getting Started
 
-First, run the development server:
+First, install the dependencies:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Then, run the development server:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+pnpm dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the application.
 
-## Learn More
+## Technology Stack
 
-To learn more about Next.js, take a look at the following resources:
+- **Frontend Framework**: [Next.js](https://nextjs.org/)
+- **Type Safety**: [TypeScript](https://www.typescriptlang.org/)
+- **Styling**: [Tailwind CSS](https://tailwindcss.com/)
+- **UI Components**: [Radix UI](https://www.radix-ui.com/)
+- **PDF Generation**: [jsPDF](https://github.com/parallax/jsPDF)
+- **Deployment**: Ready for Cloudflare deployment with Open Next.js
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Deployment
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+For Cloudflare deployment:
 
-## Deploy on Vercel
+```bash
+pnpm build:worker
+pnpm preview
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Available Scripts
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `pnpm dev`: Start the development server
+- `pnpm build`: Build the application
+- `pnpm start`: Start the production server
+- `pnpm lint`: Lint the codebase
+- `pnpm build:worker`: Build for Cloudflare
+- `pnpm preview`: Preview with Cloudflare Wrangler
+- `pnpm cf-typegen`: Generate Cloudflare type definitions
+
+## Project Structure
+
+- `/src/components/stone-generator`: Main components for stone mockup creation
+- `/src/lib`: Utility functions for drawing, exporting, and fraction handling
+- `/src/types`: TypeScript interfaces for the application
+- `/src/hooks`: Custom React hooks including local storage persistence
+
+## License
+
+MIT
