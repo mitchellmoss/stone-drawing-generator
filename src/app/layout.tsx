@@ -14,7 +14,11 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: 'Stone Mockup Generator',
-  description: 'Create professional stone mockups for countertop fabrication and similar purposes'
+  description: 'Create professional stone mockups for countertop fabrication and similar purposes',
+  icons: {
+    icon: '/icons/icon.svg',
+    shortcut: '/favicon.ico'
+  }
 }
 
 export default function RootLayout({
