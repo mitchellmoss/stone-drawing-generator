@@ -1,6 +1,9 @@
 "use client"
 
-import { exportToPDF as originalExportToPDF } from '@/lib/export-utils';
+import {
+  exportToPDF as originalExportToPDF,
+  exportMultipleToPDF as originalExportMultipleToPDF,
+} from '@/lib/export-utils';
 import { StoneSpecifications } from '@/types/stone';
 import { decimalToFraction } from '@/lib/fraction-utils';
 
@@ -37,7 +40,8 @@ export function exportMultipleToPDF(
     specs: StoneSpecifications;
     notes?: string;
   }>,
-  projectName: string
+  projectName: string,
+  isMobile: boolean = false
 ): Promise<void> {
   // Convert decimal dimensions to fraction strings for each piece
   const piecesWithFractions = pieces.map(piece => ({
@@ -50,5 +54,10 @@ export function exportMultipleToPDF(
   }));
   
   // Use the original export function with the modified pieces
-  return originalExportToPDF(canvases, piecesWithFractions, projectName);
+  return originalExportMultipleToPDF(
+    canvases,
+    piecesWithFractions,
+    projectName,
+    isMobile,
+  );
 }
