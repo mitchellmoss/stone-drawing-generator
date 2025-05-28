@@ -6,8 +6,8 @@ import { MaterialPropertiesInput } from './MaterialPropertiesInput'
 import { QuantityInput } from './QuantityInput'
 import { NotesInput } from './NotesInput'
 import { StoneSpecifications, MockupOptions, StonePiece } from '@/types/stone'
-import { drawStoneMockup } from '@/lib/drawing-utils'
-import { exportToPDF, exportMultipleToPDF } from '@/lib/export-utils'
+import { drawStoneMockup } from '@/lib/drawing-utils.optimized'
+import { exportToPDF, exportMultipleToPDF } from '@/lib/export-utils.optimized'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
 
 export interface MultiPieceExportProps {

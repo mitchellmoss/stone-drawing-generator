@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useRef, useEffect, useCallback } from 'react'
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { DimensionsInput } from './DimensionsInput'
 import { MaterialPropertiesInput } from './MaterialPropertiesInput'
 import { QuantityInput } from './QuantityInput'
@@ -21,17 +21,15 @@ const Toast = ({ message, type = 'success', onClose }: { message: string, type?:
   useEffect(() => {
     const timer = setTimeout(() => {
       onClose();
-    }, 2000); // Reduced from 3000ms to 2000ms for less intrusion
+    }, 2000);
     
     return () => clearTimeout(timer);
   }, [onClose]);
   
-  // Color scheme based on type
   const bgColor = type === 'success' ? 'bg-green-100 border-green-400 text-green-800' : 
                   type === 'error' ? 'bg-red-100 border-red-400 text-red-800' : 
                   'bg-amber-100 border-amber-400 text-amber-800';
   
-  // Positioned at top-right with smaller size and subtle styling
   return (
     <div className={`fixed top-2 right-2 ${bgColor} border px-3 py-1 rounded-md shadow-sm z-50 animate-fade-in text-sm max-w-xs opacity-90`}>
       {message}
@@ -69,73 +67,126 @@ export function StoneGenerator({ onSavePiece, onRemovePiece, savedPieces }: Ston
 
   // Canvas reference
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  
+  // Track if we need to redraw
+  const [needsRedraw, setNeedsRedraw] = useState(true);
+  
+  // Animation frame reference for cancellation
+  const animationFrameRef = useRef<number>();
+  
+  // Offscreen canvas for double buffering
+  const offscreenCanvasRef = useRef<HTMLCanvasElement>();
 
-  // Debounced redraw function to prevent excessive canvas updates
+  // Initialize offscreen canvas
+  useEffect(() => {
+    if (!offscreenCanvasRef.current) {
+      offscreenCanvasRef.current = document.createElement('canvas');
+      offscreenCanvasRef.current.width = 800;
+      offscreenCanvasRef.current.height = 600;
+    }
+  }, []);
+
+  // Optimized redraw function using requestAnimationFrame
   const redrawCanvas = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!needsRedraw) return;
+    
+    // Cancel any pending animation frame
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+    }
+    
+    animationFrameRef.current = requestAnimationFrame(() => {
+      const canvas = canvasRef.current;
+      const offscreenCanvas = offscreenCanvasRef.current;
+      if (!canvas || !offscreenCanvas) return;
 
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+      const ctx = canvas.getContext('2d', { alpha: false });
+      const offscreenCtx = offscreenCanvas.getContext('2d', { alpha: false });
+      if (!ctx || !offscreenCtx) return;
 
-    // Draw the mockup
-    drawStoneMockup(ctx, specs, options);
+      // Draw to offscreen canvas first
+      drawStoneMockup(offscreenCtx, specs, options);
+      
+      // Copy to main canvas
+      ctx.drawImage(offscreenCanvas, 0, 0);
+      
+      // Mark as redrawn
+      setNeedsRedraw(false);
+    });
+  }, [specs, options, needsRedraw]);
+
+  // Mark for redraw when specs or options change
+  useEffect(() => {
+    setNeedsRedraw(true);
   }, [specs, options]);
 
-  // Use a debounced effect for redrawing the canvas
+  // Perform redraw when needed
   useEffect(() => {
-    const timer = setTimeout(() => {
+    if (needsRedraw) {
       redrawCanvas();
-    }, 50); // 50ms debounce
-    
-    return () => clearTimeout(timer);
-  }, [redrawCanvas]);
+    }
+  }, [needsRedraw, redrawCanvas]);
+
+  // Cleanup animation frame on unmount
+  useEffect(() => {
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, []);
   
-  // Detect mobile device
-  const isMobileDevice = useCallback(() => {
+  // Detect mobile device - memoized
+  const isMobileDevice = useMemo(() => {
+    if (typeof navigator === 'undefined') return false;
     return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
   }, []);
 
-  // Handle dimension changes
-  const handleWidthChange = (width: number) => {
-    setSpecs(prev => ({ ...prev, width }));
-  };
+  // Batch state updates
+  const updateSpecs = useCallback((updates: Partial<StoneSpecifications>) => {
+    setSpecs(prev => ({ ...prev, ...updates }));
+  }, [setSpecs]);
 
-  const handleHeightChange = (height: number) => {
-    setSpecs(prev => ({ ...prev, height }));
-  };
+  // Handle dimension changes
+  const handleWidthChange = useCallback((width: number) => {
+    updateSpecs({ width });
+  }, [updateSpecs]);
+
+  const handleHeightChange = useCallback((height: number) => {
+    updateSpecs({ height });
+  }, [updateSpecs]);
 
   // Handle polished edges changes
-  const handlePolishedEdgesChange = (polishedEdges: string[]) => {
-    setSpecs(prev => ({ ...prev, polishedEdges }));
-  };
+  const handlePolishedEdgesChange = useCallback((polishedEdges: string[]) => {
+    updateSpecs({ polishedEdges });
+  }, [updateSpecs]);
 
   // Handle material properties changes
-  const handleMaterialTypeChange = (materialType: string) => {
-    setSpecs(prev => ({ ...prev, materialType }));
-  };
+  const handleMaterialTypeChange = useCallback((materialType: string) => {
+    updateSpecs({ materialType });
+  }, [updateSpecs]);
 
-  const handleThicknessChange = (thickness: string) => {
-    setSpecs(prev => ({ ...prev, thickness }));
-  };
+  const handleThicknessChange = useCallback((thickness: string) => {
+    updateSpecs({ thickness });
+  }, [updateSpecs]);
 
   // Handle quantity changes
-  const handleQuantityChange = (quantity: number) => {
-    setSpecs(prev => ({ ...prev, quantity }));
-  };
+  const handleQuantityChange = useCallback((quantity: number) => {
+    updateSpecs({ quantity });
+  }, [updateSpecs]);
 
   // Handle notes changes
-  const handleNotesChange = (newNotes: string) => {
+  const handleNotesChange = useCallback((newNotes: string) => {
     setNotes(newNotes);
-  };
+  }, [setNotes]);
 
   // Handle display options changes
-  const handleOptionChange = (option: keyof MockupOptions, value: boolean | number) => {
+  const handleOptionChange = useCallback((option: keyof MockupOptions, value: boolean | number) => {
     setOptions(prev => ({ ...prev, [option]: value }));
-  };
+  }, [setOptions]);
 
   // Handle save piece
-  const handleSavePiece = () => {
+  const handleSavePiece = useCallback(() => {
     const newPiece: StonePiece = {
       id: Date.now().toString(),
       specs: { ...specs },
@@ -152,27 +203,35 @@ export function StoneGenerator({ onSavePiece, onRemovePiece, savedPieces }: Ston
     
     // Clear notes field after saving
     setNotes('');
-  };
+  }, [specs, notes, onSavePiece, setNotes]);
 
   // Handle download as PNG
-  const handleDownloadPNG = () => {
+  const handleDownloadPNG = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     try {
-      // Create a temporary link element
-      const link = document.createElement('a');
-      link.download = `stone-mockup-${specs.width}x${specs.height}.png`;
-      link.href = canvas.toDataURL('image/png');
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      // Show success toast
-      setToast({
-        message: 'PNG downloaded successfully',
-        type: 'success'
-      });
+      // Use blob for better performance
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          throw new Error('Failed to create blob');
+        }
+        
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.download = `stone-mockup-${specs.width}x${specs.height}.png`;
+        link.href = url;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        // Show success toast
+        setToast({
+          message: 'PNG downloaded successfully',
+          type: 'success'
+        });
+      }, 'image/png');
     } catch (error) {
       console.error('Error generating PNG:', error);
       
@@ -182,21 +241,18 @@ export function StoneGenerator({ onSavePiece, onRemovePiece, savedPieces }: Ston
         type: 'error'
       });
     }
-  };
+  }, [specs]);
 
   // Handle download as PDF - improved for performance
-  const handleDownloadPDF = async () => {
+  const handleDownloadPDF = useCallback(async () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     setIsGeneratingPDF(true);
 
     try {
-      // Use the mobile detection function
-      const isMobile = isMobileDevice();
-
       // Call the improved exportToPDF with proper error handling
-      await exportToPDF(canvas, specs, notes, isMobile);
+      await exportToPDF(canvas, specs, notes, isMobileDevice);
 
       // Show success toast
       setToast({
@@ -214,24 +270,22 @@ export function StoneGenerator({ onSavePiece, onRemovePiece, savedPieces }: Ston
     } finally {
       setIsGeneratingPDF(false);
     }
-  };
+  }, [specs, notes, isMobileDevice]);
 
   // Determine if the long sides are top/bottom or left/right based on dimensions
-  const getLongSides = (): { long: string[], short: string[] } => {
+  const { longSides, shortSides } = useMemo(() => {
     if (specs.width >= specs.height) {
       return {
-        long: ['top', 'bottom'],
-        short: ['left', 'right']
+        longSides: ['top', 'bottom'],
+        shortSides: ['left', 'right']
       };
     } else {
       return {
-        long: ['left', 'right'],
-        short: ['top', 'bottom']
+        longSides: ['left', 'right'],
+        shortSides: ['top', 'bottom']
       };
     }
-  };
-
-  const { long: longSides, short: shortSides } = getLongSides();
+  }, [specs.width, specs.height]);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
